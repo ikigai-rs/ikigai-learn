@@ -40,7 +40,7 @@ and this file will say what has not been tested.
 - **The release refusals** (`crates/ikigai-learn/src/release.rs`): one sentence each, naming what
   was wrong and what to do, for a scope that is not one or is never released, an expiry that is
   not a UTC date-time or has passed, a release to the learner themselves, a caller who is not the
-  learner, a release that does not share a view or has expired, a reader holding no release, and a
+  learner (issuing, revoking or listing releases), a release that does not share a view or has expired, a reader holding no release, and a
   rewrite that would widen a release. Pinned word for word in `crates/ikigai-learn/tests/release.rs`.
 - **The revocation answer**, `revoked {release}`, plain text, pinned in the same file.
 
@@ -106,6 +106,7 @@ output people read.
 
 - 2026-11-26: first version, for the scaffold.
 - 2026-11-26: the release refusals and the revocation answer, pinned by tests.
+- 2026-11-26: the release set's refusal to anyone but the learner, pinned by tests.
 
 ## References
 

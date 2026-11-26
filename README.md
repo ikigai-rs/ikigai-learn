@@ -67,6 +67,7 @@ Names are singular, the type first, and every partition is by a named key.
 | `urn:learn:verdict:submission:{s}` | the verdict: a person's, then the checks', then `pending` |
 | `urn:learn:review:enrollment:{n}:date:{d}` | the review queue for a day: a composition |
 | `urn:learn:next:enrollment:{n}` | the next thing to work on: a composition |
+| `urn:learn:release:enrollment:{n}` | **built.** The release set: for the learner alone, a Turtle listing of each release on the enrollment (its party, scopes and expiry), which a devices-and-grants page lists and revokes from; never cached |
 | `urn:learn:release:enrollment:{n}:party:{p}` | **built.** A release: part of the learner's record shared with one party (`{p}` is the bare-hex BLAKE3 digest of the party's principal), with its scopes and expiry. An atom only the learner writes (Sink), which a rewrite may only narrow; Delete revokes it |
 | `urn:learn:credential:enrollment:{n}` | **built.** The `credential` view: the issued credential |
 | `urn:learn:completion:enrollment:{n}` | **built.** The `completion` view: complete or not, and when |
@@ -110,6 +111,17 @@ Only the enrollment's learner issues, narrows or revokes a release. A rewrite ma
 scopes, an earlier expiry) and never widen it: widening is a Delete and a new release, so the
 learner sees the change they are making.
 
+That rule is enforced at the door, not by the file: the learner's grant writes
+`enrollment/{n}/release` on the state root, so the learner's own `urn:file:` Sink there can
+rewrite a release atom directly, wider included. That is harmless, since only the learner holds
+that write and the learner may always delete and reissue; no party's grant writes there.
+
+The learner lists their releases on an enrollment at `urn:learn:release:enrollment:{n}`: Turtle
+naming each release as a member of the set, with its party, scopes and expiry. A host's
+devices-and-grants page shows that listing beside the principal's other grants and revokes a
+release with a Delete of its name, so it goes through the door rather than reading
+`enrollment/{n}/release/` around it. Only the learner reads the set; a party is Denied it.
+
 ### Capabilities and the published grants
 
 | Capability | What it allows |
@@ -152,7 +164,7 @@ becomes the composition's own name.
 Anything that leaves for another system (an LMS grade passback, xAPI statements) will leave only
 under a release, and a relay subscription will carry the release's narrowed grant, rechecked at
 every delivery (ikigai-events-relay), so revoking the release stops delivery. Ledger #4155 and
-#4157 build those; the devices-and-grants page is the host's.
+ledger #4157 build those; the devices-and-grants page is the host's.
 
 ## Privacy is a property, not a setting
 

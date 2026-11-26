@@ -306,3 +306,59 @@ fn completion_before_completing_is_a_value() {
         "<urn:learn:completion:enrollment:e1> <urn:learn:term:complete> false .\n"
     );
 }
+
+/// The release set: the learner lists every release they issued, with its party, scopes and
+/// expiry, under their published grant, and revokes one through its name.
+#[test]
+fn the_learner_lists_their_releases_and_revokes_one_from_the_list() {
+    let h = Host::new();
+    let set = release::release_set_name(N);
+    assert_eq!(set, "urn:learn:release:enrollment:e1");
+    assert_eq!(h.text_as(&h.learner(), Verb::Source, &set, &[]), "");
+
+    h.release(EMPLOYER, "completion").unwrap();
+    h.release_until(STRANGER, "credential,progress", "2027-01-01T00:00:00Z")
+        .unwrap();
+    let mut other = completion_release();
+    other.party = STRANGER.into();
+    other.scopes = [Scope::Credential, Scope::Progress].into();
+    other.expires = release::millis_of("2027-01-01T00:00:00Z").unwrap();
+    let mut both = vec![completion_release(), other.clone()];
+    both.sort_by_key(|r| release::party_key(&r.party));
+    let listed = h.text_as(&h.learner(), Verb::Source, &set, &[]);
+    assert_eq!(listed, release::release_set_turtle(N, &both));
+    for r in &both {
+        assert!(
+            listed.contains(&format!(
+                "<{set}> <urn:learn:term:release> <{}> .",
+                release_iri(&r.party)
+            )),
+            "{listed}"
+        );
+        assert!(listed.contains(&r.turtle()), "{listed}");
+    }
+
+    // Revoked from the list: a Delete of the member's name, and the next listing drops it
+    // (never a cached listing).
+    h.text_as(&h.learner(), Verb::Delete, &release_iri(EMPLOYER), &[]);
+    let listed = h.text_as(&h.learner(), Verb::Source, &set, &[]);
+    assert_eq!(listed, release::release_set_turtle(N, &[other]));
+}
+
+#[test]
+fn a_party_cannot_read_the_release_set() {
+    let h = Host::new();
+    h.release(EMPLOYER, "completion").unwrap();
+    let party = h.party(&completion_release());
+    let sentence = denied(h.issue_as(&party, Verb::Source, &release::release_set_name(N), &[]));
+    assert_eq!(
+        sentence,
+        format!(
+            "only the learner of enrollment e1 may list its releases, and {EMPLOYER} is not \
+             that learner"
+        )
+    );
+    // Nor list the directory around the door.
+    let e = h.issue_as(&party, Verb::Source, "urn:file:enrollment/e1/release", &[]);
+    assert!(matches!(e, Err(Error::Denied(_))), "{e:?}");
+}

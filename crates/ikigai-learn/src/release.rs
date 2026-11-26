@@ -29,9 +29,23 @@
 //!
 //! Responses, attempts, time and drafts have no view here and no scope names them: no release
 //! can reach them.
+//!
+//! "Narrows, never widens" is enforced at the door: a Sink through
+//! `urn:learn:release:enrollment:{n}:party:{p}` that would add a scope or move the expiry later
+//! is a Conflict. It is not a property of the file. The learner's published grant writes
+//! `enrollment/{n}/release` on the state root, so the learner's own `urn:file:` Sink there can
+//! rewrite the atom directly, wider included. That is harmless: only the learner holds that
+//! write, and the learner may always delete a release and issue a wider one; the door's rule
+//! exists so the learner sees a widening as a new release, not to protect anyone from them.
+//! No party, and no other grant this module publishes, writes there.
+//!
+//! The set `urn:learn:release:enrollment:{n}` lists the learner's releases on an enrollment
+//! (each one's party, scopes and expiry) for the learner alone, so a host's devices-and-grants
+//! page lists and revokes releases through the door rather than reading `release/` around it.
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::str::FromStr;
 
 use ikigai_core::{
     principal_scope, ActionSpec, ArgRef, ArgSpec, AsyncFnEndpoint, ContentId, Denial, Description,
@@ -291,66 +305,38 @@ pub fn parse_learner(text: &str, enrollment: &str) -> Result<String> {
 }
 
 // --- time ---------------------------------------------------------------------------------
+//
+// An expiry is an `xsd:dateTime`, so its lexical form and its calendar arithmetic come from
+// `oxsdatatypes`, the XSD datatypes crate of the oxrdf family (oxrdf's own optional `xsd`
+// dependency, at the version oxrdf pins). ikigai-core 0.5 has no date-time helper: its `Time`
+// is milliseconds since the epoch and nothing more. This module only narrows the form: UTC,
+// whole seconds, `YYYY-MM-DDThh:mm:ssZ`, so a stored release has one spelling.
+
+fn epoch() -> oxsdatatypes::DateTime {
+    oxsdatatypes::DateTime::from_str("1970-01-01T00:00:00Z").expect("the epoch is a date-time")
+}
 
 /// `YYYY-MM-DDThh:mm:ssZ` for milliseconds since the epoch (UTC), to the second.
 pub fn date_time(millis: u64) -> String {
-    let secs = millis / 1000;
-    let days = (secs / 86_400) as i64;
-    let rem = secs % 86_400;
-    // Howard Hinnant's civil_from_days.
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    format!(
-        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60
-    )
+    let since = std::time::Duration::from_secs(millis / 1000);
+    oxsdatatypes::DayTimeDuration::try_from(since)
+        .ok()
+        .and_then(|d| epoch().checked_add_day_time_duration(d))
+        .map(|t| t.to_string())
+        .expect("a u64 of milliseconds is within xsd:dateTime's range")
 }
 
 /// Milliseconds since the epoch for a `YYYY-MM-DDThh:mm:ssZ` UTC date-time, to the second.
+/// Any other spelling (an offset, a fraction, a date alone) is `None`, as is a date that does
+/// not exist, such as February 30.
 pub fn millis_of(text: &str) -> Option<u64> {
-    let b = text.as_bytes();
-    if b.len() != 20
-        || b[4] != b'-'
-        || b[7] != b'-'
-        || b[10] != b'T'
-        || b[13] != b':'
-        || b[16] != b':'
-        || b[19] != b'Z'
-    {
+    let t = oxsdatatypes::DateTime::from_str(text).ok()?;
+    if t.timezone_offset() != Some(oxsdatatypes::TimezoneOffset::UTC) {
         return None;
     }
-    let n = |r: std::ops::Range<usize>| -> Option<i64> {
-        let part = &text[r];
-        part.bytes()
-            .all(|c| c.is_ascii_digit())
-            .then(|| part.parse().ok())
-            .flatten()
-    };
-    let (y, m, d) = (n(0..4)?, n(5..7)?, n(8..10)?);
-    let (hh, mm, ss) = (n(11..13)?, n(14..16)?, n(17..19)?);
-    if !(1..=12).contains(&m) || !(1..=31).contains(&d) || hh > 23 || mm > 59 || ss > 59 {
-        return None;
-    }
-    // Howard Hinnant's days_from_civil.
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era * 146_097 + doe - 719_468;
-    let secs = days * 86_400 + hh * 3600 + mm * 60 + ss;
-    let millis = u64::try_from(secs).ok()?.checked_mul(1000)?;
-    // A date that does not exist (February 30) does not round-trip.
+    let since = std::time::Duration::try_from(t.checked_sub(epoch())?).ok()?;
+    let millis = u64::try_from(since.as_millis()).ok()?;
+    // One spelling only: `+00:00`, fractions and leading signs do not round-trip.
     (date_time(millis) == text).then_some(millis)
 }
 
@@ -614,6 +600,77 @@ fn release_door() -> AsyncFnEndpoint {
     .with_description(d)
 }
 
+/// The name of an enrollment's release set: every release its learner has issued.
+pub fn release_set_name(enrollment: &str) -> String {
+    format!("urn:learn:release:enrollment:{enrollment}")
+}
+
+/// The directory of an enrollment's release atoms, under the state root.
+pub fn release_dir(enrollment: &str) -> String {
+    format!("enrollment/{enrollment}/release")
+}
+
+/// The Turtle of an enrollment's release set: each release named as a member of the set, then
+/// each release's own atom (its party, scopes and expiry), in party-key order.
+pub fn release_set_turtle(enrollment: &str, releases: &[Release]) -> String {
+    let set = release_set_name(enrollment);
+    let mut out = String::new();
+    for r in releases {
+        out.push_str(&format!(
+            "<{set}> <{TERM}release> <{}> .\n",
+            release_name(&r.enrollment, &party_key(&r.party))
+        ));
+    }
+    for r in releases {
+        out.push_str(&r.turtle());
+    }
+    out
+}
+
+/// The release set: the learner's own listing of their releases on one enrollment, which a
+/// host's devices-and-grants page shows beside the principal's other grants and revokes from
+/// (a Delete of each member's name). Only the learner reads it.
+fn release_set_door() -> AsyncFnEndpoint {
+    let d = Description::new("learn-release-set")
+        .title("The releases of an enrollment, for its learner")
+        .summary(
+            "Source: as Turtle, every release the enrollment's LEARNER has issued, each named as \
+             a member of the set (`urn:learn:term:release`) with its party, scopes and expiry; \
+             empty when there is none. Revoke one with a Delete of its name. Anyone but the \
+             learner is Denied. Never cached: a release issued cuts only its own thread, so \
+             every listing reads the releases afresh.",
+        )
+        .verb(Verb::Source)
+        .verb(Verb::Meta)
+        .requires(CAP_RELEASE_READ)
+        .fails(FailureClass::Permanent)
+        .fails(FailureClass::Unknown)
+        .output(TURTLE)
+        .input(binding("n", "the enrollment's id"));
+    AsyncFnEndpoint::new("learn-release-set", |inv| {
+        Box::pin(async move {
+            let n = segment(inv, "n")?;
+            let who = caller(inv, "listing releases")?;
+            require_learner(inv, &n, who, "list").await?;
+            let listing = read_text(inv, &release_dir(&n)).await?.unwrap_or_default();
+            let mut releases = Vec::new();
+            for entry in listing.lines().map(str::trim).filter(|l| !l.is_empty()) {
+                // Only `{p}.ttl` is a release atom; anything else in the directory is not one.
+                let Some(key) = entry.strip_suffix(".ttl").filter(|k| is_key(k)) else {
+                    continue;
+                };
+                if let Some(r) = release_of(inv, &n, key).await? {
+                    releases.push(r);
+                }
+            }
+            // Not cacheable: ikigai-fs never caches a listing, since adding a file cuts only
+            // that file's thread, and this answer is composed over one.
+            Ok(turtle(release_set_turtle(&n, &releases)))
+        })
+    })
+    .with_description(d)
+}
+
 async fn require_learner(inv: &Invocation<'_>, n: &str, who: &str, what: &str) -> Result<()> {
     if learner_of(inv, n).await?.as_deref() == Some(who) {
         return Ok(());
@@ -787,6 +844,7 @@ pub fn space() -> EndpointSpace {
             t("urn:learn:release:enrollment:{n}:party:{p}"),
             release_door(),
         )
+        .bind(t("urn:learn:release:enrollment:{n}"), release_set_door())
         .bind(
             t("urn:learn:credential:enrollment:{n}"),
             view_door(Scope::Credential),
