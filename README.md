@@ -97,6 +97,11 @@ no cookies and no stored addresses anywhere in this module.
 - [The ikigai Book](https://ikigai-rs.github.io/ikigai-tutorial/): the first free courses are built
   on it.
 
+## Accessibility
+
+See [ACCESSIBILITY.md](ACCESSIBILITY.md): the target (WCAG 2.2 AA), the evidence that exists, what
+has not been tested, and how to report a barrier.
+
 ## License
 
 MIT OR Apache-2.0.

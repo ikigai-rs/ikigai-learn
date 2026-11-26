@@ -1,0 +1,15 @@
+[package]
+name = "ikigai-learn"
+description = "Self-paced courses as ikigai resources: units, questions, exercises and checks under urn:learn:, a learner's work as a ledger, and progress as a composition."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["ikigai", "roc", "learning", "courses", "rdf"]
+categories = ["wasm"]
+# A scaffold: nothing is published until the first endpoints are designed and tested.
+publish = false
+
+[dependencies]
