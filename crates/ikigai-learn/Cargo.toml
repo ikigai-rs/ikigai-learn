@@ -13,3 +13,23 @@ categories = ["wasm"]
 publish = false
 
 [dependencies]
+# The released kernel, as ikigai-judge links it: core 0.4 is the line ikigai-fs 0.6.0 and
+# ikigai-conformance 0.15.0 are on, so a test host links exactly one `ikigai-core`.
+ikigai-core = "0.4.0"
+# Reading the stored Turtle atoms back. Both are wasm-clean; in the browser oxrdf's `rand`
+# needs getrandom's JS backend (below), as in ikigai-core's `declare` feature.
+oxrdf = "0.3"
+oxttl = "0.2"
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Since getrandom 0.3.4 the `wasm_js` feature alone selects the browser backend: no rustflags.
+getrandom = { version = "0.3.4", features = ["wasm_js"] }
+
+[dev-dependencies]
+# The test host: ikigai-fs `cacheable_space` over a scratch state root, `ikigai-vocab`'s Meta
+# face, and the module recipe (`ikigai-conformance`) as one test. The crate itself links none
+# of them: it reaches the state root through the kernel by name.
+futures = "0.3"
+ikigai-conformance = "0.15.0"
+ikigai-fs = "0.6.0"
+ikigai-vocab = "0.4.0"

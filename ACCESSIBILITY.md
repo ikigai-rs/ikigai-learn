@@ -21,7 +21,7 @@ Adapted from the [ACCESSIBILITY.md template](https://github.com/mgifford/ACCESSI
 | Target | WCAG 2.2 Level AA, for any page or terminal that presents this output |
 | Status | Evaluation in progress. No conformance claim. |
 | Last reviewed | 2026-11-26 |
-| Next review | when the crate first emits an error sentence, a unit form or terminal text |
+| Next review | when the crate first emits a unit form or terminal text |
 
 ## Commitment
 
@@ -37,10 +37,16 @@ and this file will say what has not been tested.
 
 ### In scope
 
-Nothing yet. The repository is a scaffold: the crate exports one constant and no endpoint. As the
-crate adds output people read, each is listed here with its form and its test. The planned ones
-are a unit's four forms (`slides`, `page`, `transcript`, `handout`), question and exercise text,
-check results and verdicts, and refusal sentences.
+- **The release refusals** (`crates/ikigai-learn/src/release.rs`): one sentence each, naming what
+  was wrong and what to do, for a scope that is not one or is never released, an expiry that is
+  not a UTC date-time or has passed, a release to the learner themselves, a caller who is not the
+  learner, a release that does not share a view or has expired, a reader holding no release, and a
+  rewrite that would widen a release. Pinned word for word in `crates/ikigai-learn/tests/release.rs`.
+- **The revocation answer**, `revoked {release}`, plain text, pinned in the same file.
+
+As the crate adds output people read, each is listed here with its form and its test. The planned
+ones are a unit's four forms (`slides`, `page`, `transcript`, `handout`), question and exercise
+text, check results and verdicts.
 
 ### Not ours to fix, still ours to report
 
@@ -55,13 +61,14 @@ alignment alone; no terminal control characters from untrusted input; American E
 
 ## Conformance status
 
-No conformance claim. There is no output to evaluate yet.
+No conformance claim. The only output today is the release's refusal sentences and its plain-text
+and Turtle answers; no page presents them yet.
 
 ## Evidence
 
 | Check | Result | Evidence |
 |---|---|---|
-| Refusal sentences pinned by tests | Blocked | the crate emits no refusal yet |
+| Refusal sentences pinned by tests | Pass | the release refusals, word for word, in `crates/ikigai-learn/tests/release.rs` |
 | Unit forms checked in a browser and by an automated engine | Blocked | no unit form exists yet |
 | Unit forms read by a screen reader | Blocked | no unit form exists yet; no screen-reader session has been run |
 
@@ -69,7 +76,8 @@ No conformance claim. There is no output to evaluate yet.
 
 ## Known limitations
 
-None known, because nothing is emitted yet.
+- A refusal names a party or learner by its principal IRI, which a person may find hard to read
+  aloud; the page that presents it should show the principal's display name beside it.
 
 ## Contributor requirements
 
@@ -97,6 +105,7 @@ output people read.
 ### Change history
 
 - 2026-11-26: first version, for the scaffold.
+- 2026-11-26: the release refusals and the revocation answer, pinned by tests.
 
 ## References
 
