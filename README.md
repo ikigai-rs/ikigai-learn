@@ -11,8 +11,8 @@ resolves the same way for years and caches for good. A learner's answers, submis
 their own atoms, read over the shared names of the release they enrolled in, and their capability
 decides which graphs exist, so there is nothing to filter afterward.
 
-Status: **nothing is built yet.** This repository is a scaffold; the map below is the plan, tracked
-as ledger #4142 and its children.
+Status: **the release grant is built** (`ikigai_learn::release`, ledger #4151); everything else
+in the map below is the plan, tracked as ledger #4142 and its children.
 
 ## What the design encodes
 
@@ -67,6 +67,12 @@ Names are singular, the type first, and every partition is by a named key.
 | `urn:learn:verdict:submission:{s}` | the verdict: a person's, then the checks', then `pending` |
 | `urn:learn:review:enrollment:{n}:date:{d}` | the review queue for a day: a composition |
 | `urn:learn:next:enrollment:{n}` | the next thing to work on: a composition |
+| `urn:learn:release:enrollment:{n}` | **built.** The release set: for the learner alone, a Turtle listing of each release on the enrollment (its party, scopes and expiry), which a devices-and-grants page lists and revokes from; never cached |
+| `urn:learn:release:enrollment:{n}:party:{p}` | **built.** A release: part of the learner's record shared with one party (`{p}` is the bare-hex BLAKE3 digest of the party's principal), with its scopes and expiry. An atom only the learner writes (Sink), which a rewrite may only narrow; Delete revokes it |
+| `urn:learn:credential:enrollment:{n}` | **built.** The `credential` view: the issued credential |
+| `urn:learn:completion:enrollment:{n}` | **built.** The `completion` view: complete or not, and when |
+| `urn:learn:progress:enrollment:{n}` | **built.** The `progress` view: mastery per unit and the verdict per exercise |
+| `urn:learn:submission:enrollment:{n}:exercise:{e}` | **built.** The `submission` view: the work submitted for one exercise |
 
 Mastery and progress are compositions too: stored SPARQL or s-expression programs over one
 learner's atoms, so an answer recomputes one learner's progress and nobody else's.
@@ -81,6 +87,84 @@ run in a sandboxed worker, and the report is mirrored onto the learner's ledger 
 
 Denied (no capability, a sealed name), Conflict (a second enrollment in one release, a taken item),
 NotFound (an unknown course, unit or release), InvalidArgument (a malformed answer).
+
+## Releases: sharing part of a record
+
+A learner shares part of their own record with another party by issuing a release
+(`urn:learn:release:enrollment:{n}:party:{p}`) with one or more scopes and an expiry:
+
+| Scope | What the party reads |
+|---|---|
+| `credential` | the credential only |
+| `completion` | complete or not, and when |
+| `progress` | mastery per unit and the verdict per exercise |
+| `submission` | the work itself |
+
+Responses, attempts, time and drafts are in no scope: a release naming one is refused, and no view
+reads them. A view answers the enrollment's learner, and anyone else only while a release naming
+them shares that view and has not expired. That decision is made on every call from the release
+atom, read through the kernel: a session caches who you are, never what you may read. A cached view
+hangs from the release atom's golden thread and expires with the release, so the Delete that
+revokes a release denies the very next read.
+
+Only the enrollment's learner issues, narrows or revokes a release. A rewrite may narrow it (fewer
+scopes, an earlier expiry) and never widen it: widening is a Delete and a new release, so the
+learner sees the change they are making.
+
+That rule is enforced at the door, not by the file: the learner's grant writes
+`enrollment/{n}/release` on the state root, so the learner's own `urn:file:` Sink there can
+rewrite a release atom directly, wider included. That is harmless, since only the learner holds
+that write and the learner may always delete and reissue; no party's grant writes there.
+
+The learner lists their releases on an enrollment at `urn:learn:release:enrollment:{n}`: Turtle
+naming each release as a member of the set, with its party, scopes and expiry. A host's
+devices-and-grants page shows that listing beside the principal's other grants and revokes a
+release with a Delete of its name, so it goes through the door rather than reading
+`enrollment/{n}/release/` around it. Only the learner reads the set; a party is Denied it.
+
+### Capabilities and the published grants
+
+| Capability | What it allows |
+|---|---|
+| `urn:cap:learn:release:read` | reading a release (the door still answers only its learner and its party) |
+| `urn:cap:learn:release:write` | issuing, narrowing and revoking a release (the door still answers only its learner) |
+| `urn:cap:learn:{scope}:read` | reading the `{scope}` view (the door still checks the release) |
+
+The published grants are functions of the crate, so a host mints exactly them and a test runs under
+exactly them:
+
+- `release::learner_grant(n, learner)`: both release capabilities, all four views, read on
+  `enrollment/{n}` under the state root, write and delete on `enrollment/{n}/release` only, and the
+  learner's principal.
+- `release::party_grant(release)`: reading the release, and for each scope it shares that view
+  and the one record file it reads (`enrollment/{n}/completion.ttl` for `completion`), read on the
+  party's own release atom, and the party's principal. Nothing else on the state root: not the
+  enrollment, not the responses or drafts. A host derives it from the live release on every call,
+  which is how a release sits on the principal's devices-and-grants page beside their other grants.
+
+So a view holds three floors: the kernel enforces its declared capability, the door enforces the
+release, and ikigai-fs's path ACL enforces the grant on the state root.
+
+### Where the atoms live
+
+Under the state root a host mounts as `urn:file:` (ikigai-fs), one directory per enrollment:
+`enrollment/{n}/enrollment.ttl` (its learner), `enrollment/{n}/release/{p}.ttl`, and one record
+file per view (`credential.json`, `completion.ttl`, `progress.ttl`, `submission/{e}.ttl`). The atoms
+use the vocabulary `urn:learn:term:` (`Release`, `enrollment`, `party`, `scope`, `expires`,
+`learner`, `complete`), which this module owns.
+
+**A departure, said plainly:** until the mastery and completion compositions are built, the
+`completion` and `progress` views read a record file per view rather than computing over the
+learner's atoms. One file per scope is what lets a party's grant on the state root be exactly as
+narrow as the release. When the compositions land, each view computes, and the file it reads
+becomes the composition's own name.
+
+### Not built yet
+
+Anything that leaves for another system (an LMS grade passback, xAPI statements) will leave only
+under a release, and a relay subscription will carry the release's narrowed grant, rechecked at
+every delivery (ikigai-events-relay), so revoking the release stops delivery. Ledger #4155 and
+ledger #4157 build those; the devices-and-grants page is the host's.
 
 ## Privacy is a property, not a setting
 
