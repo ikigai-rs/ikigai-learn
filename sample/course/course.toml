@@ -1,0 +1,22 @@
+# The sample course's release manifest: this module's own format, never Lectern's deck.toml.
+format = "urn:learn:manifest:v1"
+name = "sample"
+title = "Learning to learn: a sample course"
+
+[[module]]
+name = "start"
+title = "Getting started"
+units = ["intro"]
+
+[[module]]
+name = "practice"
+title = "Practice"
+units = ["recall"]
+
+[unit.intro]
+kind = "lectern-deck"
+path = "units/intro"
+
+[unit.recall]
+kind = "lectern-deck"
+path = "units/recall"

@@ -11,8 +11,11 @@ resolves the same way for years and caches for good. A learner's answers, submis
 their own atoms, read over the shared names of the release they enrolled in, and their capability
 decides which graphs exist, so there is nothing to filter afterward.
 
-Status: **the release grant is built** (`ikigai_learn::release`, ledger #4151); everything else
-in the map below is the plan, tracked as ledger #4142 and its children.
+Status: **the release grant is built** (`ikigai_learn::release`, ledger #4151), and **stage W1
+is built** (`ikigai_learn::course`, `tools/build_release.py`, ledger #4458): a course release
+built by Lectern at a git tag, served as the course, unit, form and slide names marked below.
+Its builder is blocked on one thing, said below: Lectern's reveal pages load reveal.js from a CDN.
+Everything else in the map below is the plan, tracked as ledger #4142 and its children.
 
 ## What the design encodes
 
@@ -42,16 +45,17 @@ Names are singular, the type first, and every partition is by a named key.
 | Name | What it is |
 |---|---|
 | `urn:learn:unit:name:{u}` | a unit: an authored Lectern deck or Book chapter, read through ikigai-fs or ikigai-repo |
-| `urn:learn:unit:name:{u}:release:{r}` | the unit at a release's git tag; cacheable forever |
+| `urn:learn:unit:name:{u}:release:{r}` | **built.** The unit at a release's git tag, with its declared source kind (`lectern-deck`; `mdbook-chapter` planned), the Lectern commit that built it, its forms and its slides; cacheable forever |
+| `urn:learn:unit:name:{u}:release:{r}:form:{f}` | **built.** A face of the unit's build at a release: `slides` (Lectern's reveal HTML), `outline` and `transcript` (Lectern's outline) |
 | `urn:learn:unit:name:{u}:form:{f}` | the unit as `slides` (HTML), `page` (an article), `transcript` (prose, notes and diagram descriptions, for screen readers and audio) or `handout` (PDF) |
-| `urn:learn:slide:unit:{u}:number:{n}` | one slide, citable by feedback and the tutor |
+| `urn:learn:slide:unit:{u}:number:{n}:release:{r}` | **built.** One slide at a release, 1-based, citable by feedback and the tutor, naming its source file and slide number; its HTML face is the slides form plus `#/{n-1}` |
 | `urn:learn:slide:unit:{u}:range:{spec}` | a slide range in Lectern's `#1-3,14` grammar |
 | `urn:learn:lift:unit:{u}` | the unit's structure as RDF: ikigai-markdown's lift plus a Lectern mapping |
 | `urn:learn:question:unit:{u}:id:{q}` | a question authored inline (choice, exact, short answer, or a check script) |
 | `urn:learn:key:question:{q}`, `urn:learn:key:exercise:{e}` | an answer key; a reviewed exercise's key is sealed, readable only under `urn:cap:learn:key:read:course:{c}` |
 | `urn:learn:exercise:name:{e}` | an exercise: the task, the prediction to write first, whether an agent may help (`allowed`, `draft-only`, `none`), the evidence that counts as done, the rubric |
 | `urn:learn:check:exercise:{e}:name:{k}` | a check, as an ikigai-script resource |
-| `urn:learn:course:name:{c}:release:{r}` | a course release: its manifest at a git tag, the list of names below it |
+| `urn:learn:course:name:{c}:release:{r}` | **built.** A course release: its manifest at a git tag, its modules in order, each an ordered list of unit names at the release |
 | `urn:learn:rule:course:{c}:name:{n}` | a mastery rule, as data |
 | `urn:learn:schedule:name:{s}` | a review schedule, as data |
 
@@ -87,6 +91,52 @@ run in a sandboxed worker, and the report is mirrored onto the learner's ledger 
 
 Denied (no capability, a sealed name), Conflict (a second enrollment in one release, a taken item),
 NotFound (an unknown course, unit or release), InvalidArgument (a malformed answer).
+
+## Course releases: built by Lectern at a git tag
+
+A course is authored in git: a manifest, `course.toml` (this module's own format,
+`format = "urn:learn:manifest:v1"`, never Lectern's `deck.toml`), naming the modules in order,
+each an ordered list of units, and each unit's source kind and directory. TOML because the
+builder reads it with Python's standard `tomllib`, the crate with the wasm-clean `toml` parser,
+and authors already write TOML for Lectern.
+
+`tools/build_release.py` runs in CI at the release's tag, with Lectern installed by
+`tools/install_lectern.sh` at a pinned commit and its dependencies from a hash-locked file
+(`tools/lectern-requirements.txt`). For each unit it runs `lectern assemble` (the `@from` map)
+and `lectern build` (the reveal slides and the outline), and writes a self-contained release
+directory: `{r}/course/{c}/manifest.toml` and `{r}/unit/{u}/` (`unit.toml`, `assembled.md`,
+`slides/`, `outline.md`). Lectern runs only there, never inside an endpoint, so the crate stays
+wasm-clean and Python stays out of the kernel. The PDF needs Playwright and Chromium, so it is
+built only with `--pdf` and never in CI. The builder refuses, with one sentence saying what to
+change, a URL `asset_base`, a source kind it does not know, a unit with no `deck.toml`, a
+`LECTERN_COMMIT` that is unset or is not the installed commit, and a built page that loads
+anything from another host.
+
+**Blocked today:** Lectern at the pinned commit (`7531175f`, its current head) writes reveal.js
+into every reveal page as a load from jsDelivr, a constant with no local mode, so the builder
+refuses every reveal deck, the sample's included, until Lectern can copy reveal.js into the
+release. A viewer's request to a CDN is a request nobody here controls, so no release ships one.
+The committed `sample/release` is what the builder writes at the pin with that one check left
+out: the endpoints and their tests read it, and it is not a release to publish.
+
+`ikigai_learn::course::space(store)` serves the names over the release directory a host mounts
+as `urn:file:{store}/` (ikigai-fs, or ikigai-repo at the tag). Each is a composition over the
+release's files read through the kernel: cacheable, hanging from those files' golden threads,
+storing nothing. A slide is named from the assembled deck's `---` boundaries (outside code
+fences, as Lectern splits them) and the first `<!-- @from PATH slide=N -->` in it.
+
+**A departure, said plainly:** the form and slide names carry the release,
+`urn:learn:unit:name:{u}:release:{r}:form:{f}` and `urn:learn:slide:unit:{u}:number:{n}:release:{r}`,
+because without the release key a slide cannot resolve, or cache, for good.
+
+| Capability | What it allows |
+|---|---|
+| `urn:cap:learn:course:read` | reading a course release's names: course content, not anyone's record |
+| `urn:cap:fs:read:{store}` | reading the release directory; every course door declares it too, and narrows its reads to it |
+
+The published grant is `course::reader_grant(store)`: exactly those two. The kernel refuses a
+caller missing either before a door runs, and `urn:cap:learn:release:read`, which reads a
+learner's shared record, does not read a course.
 
 ## Releases: sharing part of a record
 

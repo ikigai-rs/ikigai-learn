@@ -1,0 +1,4 @@
+title    = "Introduction"
+author   = "ikigai-learn"
+renderer = "reveal"
+slides   = ["slides/01-welcome.md", "slides/02-plan.md"]

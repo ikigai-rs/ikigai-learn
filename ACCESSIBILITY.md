@@ -43,10 +43,27 @@ and this file will say what has not been tested.
   learner (issuing, revoking or listing releases), a release that does not share a view or has expired, a reader holding no release, and a
   rewrite that would widen a release. Pinned word for word in `crates/ikigai-learn/tests/release.rs`.
 - **The revocation answer**, `revoked {release}`, plain text, pinned in the same file.
+- **The release builder's refusals** (`tools/build_release.py`), one sentence each on standard
+  error, prefixed `build_release:`, naming what was wrong and what to change: a URL `asset_base`,
+  a unit whose source kind it does not know, a unit with no `deck.toml`, a unit with no path or
+  a path outside the course, a course or deck file that is not valid TOML, a bad name or tag, a
+  missing `course.toml` or format line, a unit listed twice or not at all, an unset or
+  mismatched `LECTERN_COMMIT`, no Lectern in the running Python, Lectern failing on a unit, and
+  a built page that loads anything from another host. `tools/test_build_release.py` pins the URL
+  `asset_base`, unknown kind, missing `deck.toml` and both `LECTERN_COMMIT` refusals word for
+  word, and the invalid-TOML and remote-load refusals by their fixed words around the detail
+  they quote; the others are not pinned by a test.
+- **`tools/install_lectern.sh`'s refusals**: an unset or short `LECTERN_COMMIT`. Not pinned by a
+  test.
+- **The course endpoints' error sentences** (`crates/ikigai-learn/src/course.rs`): a key that is
+  not a name, a slide number that is not one, a form a unit does not have, a name in no built
+  release. Their error kinds are pinned by `crates/ikigai-learn/tests/course.rs`, not their words.
+- **A unit's `slides`, `outline` and `transcript` forms** are Lectern's output, served unchanged.
+  Their accessibility is Lectern's and the author's; this crate has not evaluated it.
 
 As the crate adds output people read, each is listed here with its form and its test. The planned
-ones are a unit's four forms (`slides`, `page`, `transcript`, `handout`), question and exercise
-text, check results and verdicts.
+ones are a unit's `page` and `handout` forms, question and exercise text, check results and
+verdicts.
 
 ### Not ours to fix, still ours to report
 
@@ -61,16 +78,17 @@ alignment alone; no terminal control characters from untrusted input; American E
 
 ## Conformance status
 
-No conformance claim. The only output today is the release's refusal sentences and its plain-text
-and Turtle answers; no page presents them yet.
+No conformance claim. The output today is the release's refusal sentences and its plain-text
+and Turtle answers, the builder's refusal sentences, and the sample course's Lectern forms, which
+no one has evaluated; no page presents the sentences yet.
 
 ## Evidence
 
 | Check | Result | Evidence |
 |---|---|---|
-| Refusal sentences pinned by tests | Pass | the release refusals, word for word, in `crates/ikigai-learn/tests/release.rs` |
-| Unit forms checked in a browser and by an automated engine | Blocked | no unit form exists yet |
-| Unit forms read by a screen reader | Blocked | no unit form exists yet; no screen-reader session has been run |
+| Refusal sentences pinned by tests | Pass, in part | the release refusals, word for word, in `crates/ikigai-learn/tests/release.rs`; the builder's, word for word, in `tools/test_build_release.py`; the course endpoints' by error kind only |
+| Unit forms checked in a browser and by an automated engine | Blocked | the sample's forms exist but have not been checked |
+| Unit forms read by a screen reader | Blocked | no screen-reader session has been run |
 
 **No screen reader or other assistive technology has been used to test this repository.**
 
@@ -107,6 +125,8 @@ output people read.
 - 2026-11-26: first version, for the scaffold.
 - 2026-11-26: the release refusals and the revocation answer, pinned by tests.
 - 2026-11-26: the release set's refusal to anyone but the learner, pinned by tests.
+- 2026-11-26: stage W1: the release builder's refusals, the course endpoints' error sentences,
+  and the Lectern forms.
 
 ## References
 
