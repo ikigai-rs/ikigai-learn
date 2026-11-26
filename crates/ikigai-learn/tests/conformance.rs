@@ -16,6 +16,9 @@ const OURS: [&str; 5] = [
     "learn-submission",
 ];
 
+/// The release set: owned and walked, but never cached.
+const SET: &str = "learn-release-set";
+
 fn walk() -> ikigai_conformance::Report {
     let h = Host::new();
     h.release(EMPLOYER, "completion").unwrap();
@@ -29,6 +32,9 @@ fn walk() -> ikigai_conformance::Report {
     for id in OURS {
         suite = suite.own(id).cacheable(id);
     }
+    // The release set is a listing over a directory, which ikigai-fs never caches, so it is
+    // owned and declared live (uncacheable on purpose).
+    suite = suite.own(SET).live(SET);
     // Every probe runs as the learner, under their published grant: the doors answer about
     // their caller, and root names no principal.
     let learner = h.learner();
@@ -37,6 +43,12 @@ fn walk() -> ikigai_conformance::Report {
             "learn-release",
             Check::Pipeline,
             "a release is three named values (party, scope, expires), not a piped body",
+        )
+        .opt_out_check(
+            SET,
+            Check::Bodies,
+            "a live listing: independent calls cannot agree by bytes; tests/release.rs pins \
+             its body after each issue and revoke",
         )
         .opt_out(
             "learn-release",
@@ -58,6 +70,11 @@ fn walk() -> ikigai_conformance::Report {
                 .arg("party", EMPLOYER)
                 .arg("scope", "completion")
                 .arg("expires", EXPIRES),
+        )
+        .fixture(
+            Fixture::new(SET, Verb::Source)
+                .capability(learner.clone())
+                .binding("n", N),
         )
         .fixture(
             Fixture::new("learn-credential", Verb::Source)
@@ -96,6 +113,7 @@ fn the_walk_reaches_every_resource_this_crate_binds() {
     let mut walked: Vec<&str> = report.walked.iter().map(String::as_str).collect();
     walked.sort_unstable();
     let mut expected = OURS.to_vec();
+    expected.push(SET);
     expected.sort_unstable();
     assert_eq!(walked, expected);
 }
