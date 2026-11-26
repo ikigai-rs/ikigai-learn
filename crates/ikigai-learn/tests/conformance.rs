@@ -117,3 +117,71 @@ fn the_walk_reaches_every_resource_this_crate_binds() {
     expected.sort_unstable();
     assert_eq!(walked, expected);
 }
+
+/// The course doors: a host-named space (it reads the store it was handed), walked over the
+/// committed sample release under exactly the published reader grant.
+const COURSE: [&str; 4] = ["learn-course", "learn-unit", "learn-form", "learn-slide"];
+
+fn course_walk() -> ikigai_conformance::Report {
+    use ikigai_core::{Capability, Fallback, Kernel};
+    use ikigai_learn::course;
+    use std::sync::Arc;
+
+    let sample = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sample");
+    let doors = Arc::new(course::space("release"));
+    let files = Arc::new(ikigai_fs::cacheable_space(sample));
+    let whole = Arc::new(Fallback::new(vec![doors.clone(), files]));
+    let kernel = Kernel::with_meta_renderer(whole.clone(), Arc::new(ikigai_vocab::TurtleRenderer));
+    let reader = Capability::root().attenuate(course::reader_grant("release"));
+    let mut suite = Suite::new()
+        .host_named_space("course::space(store)", doors)
+        .body_space(whole);
+    for id in COURSE {
+        suite = suite.own(id).cacheable(id);
+    }
+    suite = suite
+        .fixture(
+            Fixture::new("learn-course", Verb::Source)
+                .capability(reader.clone())
+                .binding("c", "sample")
+                .binding("r", "v1"),
+        )
+        .fixture(
+            Fixture::new("learn-unit", Verb::Source)
+                .capability(reader.clone())
+                .binding("u", "recall")
+                .binding("r", "v1"),
+        )
+        .fixture(
+            Fixture::new("learn-form", Verb::Source)
+                .capability(reader.clone())
+                .binding("u", "recall")
+                .binding("r", "v1")
+                .binding("f", "outline"),
+        )
+        .fixture(
+            Fixture::new("learn-slide", Verb::Source)
+                .capability(reader)
+                .binding("u", "recall")
+                .binding("n", "2")
+                .binding("r", "v1"),
+        );
+    suite.run_blocking(&kernel)
+}
+
+#[test]
+fn the_course_doors_conform() {
+    let report = course_walk();
+    println!("{report}");
+    report.assert_clean_with(&Expected::new().nothing_unprobed());
+}
+
+#[test]
+fn the_course_walk_reaches_every_course_door() {
+    let report = course_walk();
+    let mut walked: Vec<&str> = report.walked.iter().map(String::as_str).collect();
+    walked.sort_unstable();
+    let mut expected = COURSE.to_vec();
+    expected.sort_unstable();
+    assert_eq!(walked, expected);
+}

@@ -1,0 +1,5 @@
+title    = "Retrieval practice"
+author   = "ikigai-learn"
+renderer = "reveal"
+partials = ["./_partials"]
+slides   = ["slides/01-why.md", "_partials/techniques.md#2-3"]
