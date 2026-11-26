@@ -94,6 +94,8 @@ no cookies and no stored addresses anywhere in this module.
 - [ikigai-credential](https://github.com/ikigai-rs/ikigai-credential): verifiable credentials for
   a completed course release.
 - [ikigai-markdown](https://github.com/ikigai-rs/ikigai-markdown): the structural lift units use.
+- [Wrap Lectern, or build a native course module](docs/lectern-wrap-or-native.md): the design
+  note behind the plan to wrap Lectern first.
 - [The ikigai Book](https://ikigai-rs.github.io/ikigai-tutorial/): the first free courses are built
   on it.
 
