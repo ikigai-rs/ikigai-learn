@@ -9,8 +9,6 @@ repository.workspace = true
 readme = "../../README.md"
 keywords = ["ikigai", "roc", "learning", "courses", "rdf"]
 categories = ["wasm"]
-# A scaffold: nothing is published until the first endpoints are designed and tested.
-publish = false
 
 [dependencies]
 # The released kernel, on the ecosystem's current line: core 0.5 is the line ikigai-fs 0.7.0,
